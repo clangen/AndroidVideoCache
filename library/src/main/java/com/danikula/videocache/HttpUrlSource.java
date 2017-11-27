@@ -2,8 +2,10 @@ package com.danikula.videocache;
 
 import android.text.TextUtils;
 
+import com.danikula.videocache.headers.EmptyHeaderReceiver;
 import com.danikula.videocache.headers.EmptyHeadersInjector;
 import com.danikula.videocache.headers.HeaderInjector;
+import com.danikula.videocache.headers.HeaderReceiver;
 import com.danikula.videocache.sourcestorage.SourceInfoStorage;
 import com.danikula.videocache.sourcestorage.SourceInfoStorageFactory;
 
@@ -16,6 +18,9 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.danikula.videocache.Preconditions.checkNotNull;
@@ -38,6 +43,7 @@ public class HttpUrlSource implements Source {
     private static final int MAX_REDIRECTS = 5;
     private final SourceInfoStorage sourceInfoStorage;
     private final HeaderInjector headerInjector;
+    private final HeaderReceiver headerReceiver;
     private SourceInfo sourceInfo;
     private HttpURLConnection connection;
     private InputStream inputStream;
@@ -47,12 +53,13 @@ public class HttpUrlSource implements Source {
     }
 
     public HttpUrlSource(String url, SourceInfoStorage sourceInfoStorage) {
-        this(url, sourceInfoStorage, new EmptyHeadersInjector());
+        this(url, sourceInfoStorage, new EmptyHeadersInjector(), new EmptyHeaderReceiver());
     }
 
-    public HttpUrlSource(String url, SourceInfoStorage sourceInfoStorage, HeaderInjector headerInjector) {
+    public HttpUrlSource(String url, SourceInfoStorage sourceInfoStorage, HeaderInjector headerInjector, HeaderReceiver headerReceiver) {
         this.sourceInfoStorage = checkNotNull(sourceInfoStorage);
         this.headerInjector = checkNotNull(headerInjector);
+        this.headerReceiver = checkNotNull(headerReceiver);
         SourceInfo sourceInfo = sourceInfoStorage.get(url);
         this.sourceInfo = sourceInfo != null ? sourceInfo :
                 new SourceInfo(url, Integer.MIN_VALUE, ProxyCacheUtils.getSupposablyMime(url));
@@ -62,6 +69,7 @@ public class HttpUrlSource implements Source {
         this.sourceInfo = source.sourceInfo;
         this.sourceInfoStorage = source.sourceInfoStorage;
         this.headerInjector = source.headerInjector;
+        this.headerReceiver = source.headerReceiver;
     }
 
     @Override
@@ -183,7 +191,18 @@ public class HttpUrlSource implements Source {
                 throw new ProxyCacheException("Too many redirects: " + redirectCount);
             }
         } while (redirected);
+
+        receiveCustomHeaders(connection, url);
         return connection;
+    }
+
+    private void receiveCustomHeaders(HttpURLConnection connection, String url) {
+        Map<String, List<String>> copied = new HashMap<>();
+        Map<String, List<String>> original = connection.getHeaderFields();
+        for (final String key : original.keySet()) {
+            copied.put(key, new ArrayList<>(original.get(key)));
+        }
+        headerReceiver.receiveHeaders(url, copied);
     }
 
     private void injectCustomHeaders(HttpURLConnection connection, String url) {

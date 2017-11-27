@@ -8,8 +8,10 @@ import com.danikula.videocache.file.FileNameGenerator;
 import com.danikula.videocache.file.Md5FileNameGenerator;
 import com.danikula.videocache.file.TotalCountLruDiskUsage;
 import com.danikula.videocache.file.TotalSizeLruDiskUsage;
+import com.danikula.videocache.headers.EmptyHeaderReceiver;
 import com.danikula.videocache.headers.EmptyHeadersInjector;
 import com.danikula.videocache.headers.HeaderInjector;
+import com.danikula.videocache.headers.HeaderReceiver;
 import com.danikula.videocache.sourcestorage.SourceInfoStorage;
 import com.danikula.videocache.sourcestorage.SourceInfoStorageFactory;
 
@@ -179,6 +181,10 @@ public class HttpProxyCacheServer {
         } catch (IOException e) {
             onError(new ProxyCacheException("Error shutting down proxy server", e));
         }
+    }
+
+    public File getCacheDirectory() {
+        return config.cacheRoot;
     }
 
     private boolean isAlive() {
@@ -353,6 +359,7 @@ public class HttpProxyCacheServer {
         private DiskUsage diskUsage;
         private SourceInfoStorage sourceInfoStorage;
         private HeaderInjector headerInjector;
+        private HeaderReceiver headerReceiver;
 
         public Builder(Context context) {
             this.sourceInfoStorage = SourceInfoStorageFactory.newSourceInfoStorage(context);
@@ -360,6 +367,7 @@ public class HttpProxyCacheServer {
             this.diskUsage = new TotalSizeLruDiskUsage(DEFAULT_MAX_SIZE);
             this.fileNameGenerator = new Md5FileNameGenerator();
             this.headerInjector = new EmptyHeadersInjector();
+            this.headerReceiver = new EmptyHeaderReceiver();
         }
 
         /**
@@ -442,6 +450,16 @@ public class HttpProxyCacheServer {
         }
 
         /**
+         * Receive headers from the server's response
+         * @param headerReceiver callback which will be invoked with headers
+         * @return a builder
+         */
+        public Builder headerReceiver(HeaderReceiver headerReceiver) {
+            this.headerReceiver = checkNotNull(headerReceiver);
+            return this;
+        }
+
+        /**
          * Builds new instance of {@link HttpProxyCacheServer}.
          *
          * @return proxy cache. Only single instance should be used across whole app.
@@ -452,7 +470,7 @@ public class HttpProxyCacheServer {
         }
 
         private Config buildConfig() {
-            return new Config(cacheRoot, fileNameGenerator, diskUsage, sourceInfoStorage, headerInjector);
+            return new Config(cacheRoot, fileNameGenerator, diskUsage, sourceInfoStorage, headerInjector, headerReceiver);
         }
 
     }
