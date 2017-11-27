@@ -1,12 +1,14 @@
 package com.danikula.videocache;
 
 import com.danikula.videocache.headers.HeaderInjector;
+import com.danikula.videocache.headers.HeaderReceiver;
 import com.danikula.videocache.sourcestorage.SourceInfoStorage;
 import com.danikula.videocache.sourcestorage.SourceInfoStorageFactory;
 import com.danikula.videocache.support.ProxyCacheTestUtils;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 
 import java.io.ByteArrayOutputStream;
@@ -161,9 +163,11 @@ public class HttpUrlSourceTest extends BaseTest {
     @Test(expected = NullPointerException.class)
     public void testHeaderInjectorNullNotAcceptable() throws Exception {
         HeaderInjector mockedHeaderInjector = Mockito.mock(HeaderInjector.class);
+        HeaderReceiver mockedHeaderReceiver = Mockito.mock(HeaderReceiver.class);
         when(mockedHeaderInjector.addHeaders(Mockito.anyString())).thenReturn(null);
         SourceInfoStorage emptySourceInfoStorage = SourceInfoStorageFactory.newEmptySourceInfoStorage();
-        HttpUrlSource source = new HttpUrlSource(HTTP_DATA_URL_ONE_REDIRECT, emptySourceInfoStorage, mockedHeaderInjector);
+        HttpUrlSource source = new HttpUrlSource(HTTP_DATA_URL_ONE_REDIRECT,
+            emptySourceInfoStorage, mockedHeaderInjector, mockedHeaderReceiver);
         source.open(0);
         fail("source.open should throw NPE!");
     }
