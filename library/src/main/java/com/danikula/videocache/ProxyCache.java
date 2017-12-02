@@ -39,7 +39,7 @@ class ProxyCache {
     public int read(byte[] buffer, long offset, int length) throws ProxyCacheException {
         ProxyCacheUtils.assertBuffer(buffer, offset, length);
 
-        while (!cache.isCompleted() && cache.available() < (offset + length) && !stopped) {
+        while (!cache.isCompleted() && cache.length() < (offset + length) && !stopped) {
             readSourceAsync();
             waitForSourceData();
             checkReadSourceErrorsCount();
@@ -119,8 +119,14 @@ class ProxyCache {
         long sourceAvailable = -1;
         long offset = 0;
         try {
-            offset = cache.available();
-            source.open(offset);
+            offset = cache.length();
+            long actualOffset = source.open(offset);
+
+            if (actualOffset != offset) {
+                cache.position(actualOffset);
+                offset = actualOffset;
+            }
+
             sourceAvailable = source.length();
             byte[] buffer = new byte[ProxyCacheUtils.DEFAULT_BUFFER_SIZE];
             int readBytes;
@@ -153,7 +159,7 @@ class ProxyCache {
 
     private void tryComplete() throws ProxyCacheException {
         synchronized (stopLock) {
-            if (!isStopped() && cache.available() == source.length()) {
+            if (!isStopped() && cache.length() == source.length()) {
                 cache.complete();
             }
         }
@@ -181,7 +187,6 @@ class ProxyCache {
     }
 
     private class SourceReaderRunnable implements Runnable {
-
         @Override
         public void run() {
             readSource();

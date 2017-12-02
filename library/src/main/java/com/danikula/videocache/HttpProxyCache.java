@@ -51,7 +51,7 @@ class HttpProxyCache extends ProxyCache {
     private boolean isUseCache(GetRequest request) throws ProxyCacheException {
         long sourceLength = source.length();
         boolean sourceLengthKnown = sourceLength > 0;
-        long cacheAvailable = cache.available();
+        long cacheAvailable = cache.length();
         // do not use cache for partial requests which too far from available cache. It seems user seek video.
         return !sourceLengthKnown || !request.partial || request.rangeOffset <= cacheAvailable + sourceLength * NO_CACHE_BARRIER;
     }
@@ -59,7 +59,7 @@ class HttpProxyCache extends ProxyCache {
     private String newResponseHeaders(GetRequest request) throws IOException, ProxyCacheException {
         String mime = source.getMime();
         boolean mimeKnown = !TextUtils.isEmpty(mime);
-        long length = cache.isCompleted() ? cache.available() : source.length();
+        long length = cache.isCompleted() ? cache.length() : source.length();
         boolean lengthKnown = length >= 0;
         long contentLength = request.partial ? length - request.rangeOffset : length;
         boolean addRange = lengthKnown && request.partial;

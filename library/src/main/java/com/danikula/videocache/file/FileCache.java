@@ -19,6 +19,7 @@ public class FileCache implements Cache {
     private final DiskUsage diskUsage;
     public File file;
     private RandomAccessFile dataFile;
+    private long writePos = 0;
 
     public FileCache(File file) throws ProxyCacheException {
         this(file, new UnlimitedDiskUsage());
@@ -35,19 +36,26 @@ public class FileCache implements Cache {
             boolean completed = file.exists();
             this.file = completed ? file : new File(file.getParentFile(), file.getName() + TEMP_POSTFIX);
             this.dataFile = new RandomAccessFile(this.file, completed ? "r" : "rw");
+            this.writePos = this.dataFile.length();
         } catch (IOException e) {
             throw new ProxyCacheException("Error using file " + file + " as disc cache", e);
         }
     }
 
     @Override
-    public synchronized long available() throws ProxyCacheException {
+    public void position(long offset) throws ProxyCacheException {
         try {
-            return (int) dataFile.length();
-        } catch (IOException e) {
-            throw new ProxyCacheException("Error reading length of file " + file, e);
+            this.writePos = Math.min(this.dataFile.length(), offset);
+        }
+        catch (IOException e) {
+            throw new ProxyCacheException("Unable to get RAF length", e);
         }
     }
+
+    @Override
+    public synchronized long length() throws ProxyCacheException {
+        return (int) this.writePos;
+  }
 
     @Override
     public synchronized int read(byte[] buffer, long offset, int length) throws ProxyCacheException {
@@ -56,7 +64,7 @@ public class FileCache implements Cache {
             return dataFile.read(buffer, 0, length);
         } catch (IOException e) {
             String format = "Error reading %d bytes with offset %d from file[%d bytes] to buffer[%d bytes]";
-            throw new ProxyCacheException(String.format(format, length, offset, available(), buffer.length), e);
+            throw new ProxyCacheException(String.format(format, length, offset, length(), buffer.length), e);
         }
     }
 
@@ -66,8 +74,9 @@ public class FileCache implements Cache {
             if (isCompleted()) {
                 throw new ProxyCacheException("Error append cache: cache file " + file + " is completed!");
             }
-            dataFile.seek(available());
+            dataFile.seek(this.writePos);
             dataFile.write(data, 0, length);
+            this.writePos += length;
         } catch (IOException e) {
             String format = "Error writing %d bytes to %s from buffer with size %d";
             throw new ProxyCacheException(String.format(format, length, dataFile, data.length), e);

@@ -11,9 +11,10 @@ public interface Source {
      * Opens source. Source should be open before using {@link #read(byte[])}
      *
      * @param offset offset in bytes for source.
+     * @return the actual offset; may differ than the requested offset.
      * @throws ProxyCacheException if error occur while opening source.
      */
-    void open(long offset) throws ProxyCacheException;
+    long open(long offset) throws ProxyCacheException;
 
     /**
      * Returns length bytes or <b>negative value</b> if length is unknown.

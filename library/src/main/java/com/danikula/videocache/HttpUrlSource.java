@@ -48,7 +48,11 @@ public class HttpUrlSource implements Source {
     private HttpURLConnection connection;
     private InputStream inputStream;
 
-    public HttpUrlSource(String url) {
+    private static class OffsetAndLength {
+        long offset, length;
+    }
+
+    HttpUrlSource(String url) {
         this(url, SourceInfoStorageFactory.newEmptySourceInfoStorage());
     }
 
@@ -56,7 +60,7 @@ public class HttpUrlSource implements Source {
         this(url, sourceInfoStorage, new EmptyHeadersInjector(), new EmptyHeaderReceiver());
     }
 
-    public HttpUrlSource(String url, SourceInfoStorage sourceInfoStorage, HeaderInjector headerInjector, HeaderReceiver headerReceiver) {
+    HttpUrlSource(String url, SourceInfoStorage sourceInfoStorage, HeaderInjector headerInjector, HeaderReceiver headerReceiver) {
         this.sourceInfoStorage = checkNotNull(sourceInfoStorage);
         this.headerInjector = checkNotNull(headerInjector);
         this.headerReceiver = checkNotNull(headerReceiver);
@@ -65,7 +69,7 @@ public class HttpUrlSource implements Source {
                 new SourceInfo(url, Integer.MIN_VALUE, ProxyCacheUtils.getSupposablyMime(url));
     }
 
-    public HttpUrlSource(HttpUrlSource source) {
+    HttpUrlSource(HttpUrlSource source) {
         this.sourceInfo = source.sourceInfo;
         this.sourceInfoStorage = source.sourceInfoStorage;
         this.headerInjector = source.headerInjector;
@@ -81,23 +85,47 @@ public class HttpUrlSource implements Source {
     }
 
     @Override
-    public void open(long offset) throws ProxyCacheException {
+    public long open(long offset) throws ProxyCacheException {
         try {
             connection = openConnection(offset, -1);
             String mime = connection.getContentType();
             inputStream = new BufferedInputStream(connection.getInputStream(), DEFAULT_BUFFER_SIZE);
-            long length = readSourceAvailableBytes(connection, offset, connection.getResponseCode());
-            this.sourceInfo = new SourceInfo(sourceInfo.url, length, mime);
+
+            final OffsetAndLength offsetAndLength =
+                readSourceAvailableBytes(connection, offset, connection.getResponseCode());
+
+            this.sourceInfo = new SourceInfo(sourceInfo.url, offsetAndLength.length, mime);
             this.sourceInfoStorage.put(sourceInfo.url, sourceInfo);
+
+            return offsetAndLength.offset;
         } catch (IOException e) {
             throw new ProxyCacheException("Error opening connection for " + sourceInfo.url + " with offset " + offset, e);
         }
     }
 
-    private long readSourceAvailableBytes(HttpURLConnection connection, long offset, int responseCode) throws IOException {
+    private OffsetAndLength readSourceAvailableBytes(HttpURLConnection connection, long offset, int responseCode) throws IOException {
         long contentLength = getContentLength(connection);
-        return responseCode == HTTP_OK ? contentLength
-                : responseCode == HTTP_PARTIAL ? contentLength + offset : sourceInfo.length;
+        final OffsetAndLength offsetAndLength = new OffsetAndLength();
+
+        switch (responseCode) {
+            case HTTP_OK: {
+                offsetAndLength.offset = 0;
+                offsetAndLength.length = contentLength;
+                break;
+            }
+            case HTTP_PARTIAL: {
+                offsetAndLength.offset = offset;
+                offsetAndLength.length = contentLength + offset;
+                break;
+            }
+            default: {
+                offsetAndLength.offset = offset;
+                offsetAndLength.length = sourceInfo.length;
+                break;
+            }
+        }
+
+        return offsetAndLength;
     }
 
     private long getContentLength(HttpURLConnection connection) {
@@ -223,7 +251,7 @@ public class HttpUrlSource implements Source {
         return sourceInfo.url;
     }
 
-    public int getResponseCode() throws IOException {
+    int getResponseCode() throws IOException {
         return connection.getResponseCode();
     }
 

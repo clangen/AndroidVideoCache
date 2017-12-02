@@ -7,11 +7,13 @@ package com.danikula.videocache;
  */
 public interface Cache {
 
-    long available() throws ProxyCacheException;
+    long length() throws ProxyCacheException;
 
     int read(byte[] buffer, long offset, int length) throws ProxyCacheException;
 
     void append(byte[] data, int length) throws ProxyCacheException;
+
+    void position(long offset) throws ProxyCacheException;
 
     void close() throws ProxyCacheException;
 

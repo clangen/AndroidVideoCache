@@ -86,7 +86,7 @@ public class FileCacheTest extends BaseTest {
         fileCache.read(readData, firstPortionLength, secondPortionLength);
         assertThat(readData).isEqualTo(wroteSecondPortion);
 
-        readData = new byte[(int)fileCache.available()];
+        readData = new byte[(int)fileCache.length()];
         fileCache.read(readData, 0, readData.length);
         byte[] fileContent = getFileContent(getTempFile(file));
         assertThat(readData).isEqualTo(fileContent);
@@ -139,7 +139,7 @@ public class FileCacheTest extends BaseTest {
         File file = new File("/system/data.bin");
         FileCache fileCache = new FileCache(file);
         Files.delete(file);
-        fileCache.available();
+        fileCache.length();
         Assert.fail();
     }
 
